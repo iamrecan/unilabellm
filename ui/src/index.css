@@ -1,0 +1,175 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #000;
+  --surface:      #0a0a0a;
+  --surface2:     #111;
+  --surface3:     #1a1a1a;
+  --border:       #2e2e2e;
+  --border-hover: #444;
+
+  --text:         #ededed;
+  --text-dim:     #888;
+  --text-muted:   #444;
+
+  /* Vercel uses blue as the sole accent */
+  --accent:       #0070f3;
+  --accent-hover: #0060df;
+  --accent-dim:   rgba(0, 112, 243, 0.1);
+
+  --green:  #50e3c2;
+  --yellow: #f5a623;
+  --red:    #e00;
+  --blue:   #0070f3;
+
+  --green-dim:  rgba(80, 227, 194, 0.1);
+  --yellow-dim: rgba(245, 166, 35,  0.1);
+  --red-dim:    rgba(238, 0,   0,   0.08);
+
+  --radius: 6px;
+  --font:   'Geist', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:   'Geist Mono', 'Fira Code', monospace;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Typography ── */
+h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.03em; }
+h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+h3 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+
+/* ── Inputs ── */
+input, textarea, select {
+  font-family: var(--font);
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  height: 36px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+input[type="number"] { -moz-appearance: textfield; }
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button { -webkit-appearance: none; }
+input:focus, textarea:focus { border-color: var(--text); }
+input::placeholder { color: var(--text-muted); }
+
+/* ── Buttons ── */
+button {
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 14px;
+  border: none;
+  outline: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Primary — white fill on black (Vercel style) */
+.btn-primary {
+  background: var(--text);
+  color: var(--bg);
+  border: 1px solid var(--text);
+}
+.btn-primary:hover { background: #ccc; border-color: #ccc; }
+.btn-primary:active { background: #aaa; }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Ghost — bordered */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { background: var(--surface2); color: var(--text); border-color: var(--border-hover); }
+
+/* Danger */
+.btn-danger {
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--border);
+}
+.btn-danger:hover { background: var(--red-dim); border-color: var(--red); }
+
+/* ── Alias Chips ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  height: 26px;
+  border-radius: 13px;
+  font-size: 12px;
+  font-family: var(--mono);
+  font-weight: 400;
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.15s, opacity 0.15s;
+  border: 1px solid var(--border);
+}
+.chip:hover { border-color: var(--border-hover); }
+.chip:active { cursor: grabbing; }
+
+.chip-default { background: var(--surface2); color: var(--text); }
+.chip-low-confidence { background: var(--yellow-dim); color: var(--yellow); border-color: rgba(245,166,35,0.3); }
+.chip-dragging { opacity: 0.35; }
+
+.chip-remove {
+  background: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  height: auto;
+  border-radius: 0;
+}
+.chip-remove:hover { color: var(--red); }
+
+/* ── Status dot ── */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* ── Divider ── */
+.divider { border: none; border-top: 1px solid var(--border); }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+/* ── Fade in ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.2s ease both; }

@@ -1,0 +1,24 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - WORKSPACE_PATH=/workspace
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./workspace:/workspace
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped

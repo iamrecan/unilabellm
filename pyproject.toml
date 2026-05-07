@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unilabellm"
+version = "0.1.0"
+description = "Domain-agnostic, LLM-powered YOLO dataset unification framework"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.54.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "python-dotenv>=1.0.0",
+    "click>=8.1.0",
+    "pyyaml>=6.0.2",
+    "pillow>=11.0.0",
+    "imagehash>=4.3.1",
+    "rich>=13.9.0",
+    "httpx>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "black>=24.10.0",
+    "httpx>=0.28.0",
+]
+kaggle = ["kaggle>=1.6.0"]
+roboflow = ["roboflow>=1.1.0"]
+sources = ["kaggle>=1.6.0", "roboflow>=1.1.0"]
+inference = ["ultralytics>=8.0.0"]
+
+[project.scripts]
+unilabellm = "cli.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "api*", "cli*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
