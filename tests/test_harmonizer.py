@@ -186,7 +186,8 @@ def test_validate_all_good(canonical_classes, sample_sources):
 def test_validate_unmapped(canonical_classes, sample_sources):
     sample_sources[0].classes.append("drone")
     result = validate(canonical_classes, sample_sources)
-    assert not result.valid
+    # Unmapped labels are warnings only — only conflicts are hard errors.
+    assert result.valid
     assert "drone" in result.unmapped
     assert len(result.warnings) > 0
 

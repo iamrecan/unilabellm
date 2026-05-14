@@ -16,11 +16,11 @@ MOCK_RESPONSE = {
 }
 
 
-def make_mock_client(response_text: str):
+def make_mock_openai_client(response_text: str):
     client = MagicMock()
-    msg = MagicMock()
-    msg.content = [MagicMock(text=response_text)]
-    client.messages.create.return_value = msg
+    choice = MagicMock()
+    choice.message.content = response_text
+    client.chat.completions.create.return_value = MagicMock(choices=[choice])
     return client
 
 
@@ -61,14 +61,14 @@ def test_build_user_prompt_domain_hint():
 
 
 def test_analyzer_no_api_key():
-    with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
+    with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
         SemanticAnalyzer(api_key="")
 
 
-@patch("core.llm.analyzer.anthropic.Anthropic")
-def test_analyzer_success(mock_anthropic_cls):
-    mock_client = make_mock_client(json.dumps(MOCK_RESPONSE))
-    mock_anthropic_cls.return_value = mock_client
+@patch("core.llm.analyzer.openai.OpenAI")
+def test_analyzer_success(mock_openai_cls):
+    mock_client = make_mock_openai_client(json.dumps(MOCK_RESPONSE))
+    mock_openai_cls.return_value = mock_client
 
     analyzer = SemanticAnalyzer(api_key="test-key")
     result = analyzer.analyze(
@@ -78,15 +78,15 @@ def test_analyzer_success(mock_anthropic_cls):
     assert result.unmapped == []
 
 
-@patch("core.llm.analyzer.anthropic.Anthropic")
-def test_analyzer_empty_input(mock_anthropic_cls):
+@patch("core.llm.analyzer.openai.OpenAI")
+def test_analyzer_empty_input(mock_openai_cls):
     analyzer = SemanticAnalyzer(api_key="test-key")
     with pytest.raises(ValueError, match="empty"):
         analyzer.analyze({})
 
 
-@patch("core.llm.analyzer.anthropic.Anthropic")
-def test_analyzer_adds_unmapped_labels(mock_anthropic_cls):
+@patch("core.llm.analyzer.openai.OpenAI")
+def test_analyzer_adds_unmapped_labels(mock_openai_cls):
     """Labels not covered by LLM response get added to unmapped list."""
     partial_response = {
         "canonical_classes": [
@@ -94,24 +94,27 @@ def test_analyzer_adds_unmapped_labels(mock_anthropic_cls):
         ],
         "unmapped": [],
     }
-    mock_client = make_mock_client(json.dumps(partial_response))
-    mock_anthropic_cls.return_value = mock_client
+    mock_client = make_mock_openai_client(json.dumps(partial_response))
+    mock_openai_cls.return_value = mock_client
 
     analyzer = SemanticAnalyzer(api_key="test-key")
     result = analyzer.analyze({"ds": ["car", "mystery_label"]})
     assert "mystery_label" in result.unmapped
 
 
-@patch("core.llm.analyzer.anthropic.Anthropic")
+@patch("core.llm.analyzer.openai.OpenAI")
 @patch("core.llm.analyzer.time.sleep")
-def test_analyzer_retries_on_rate_limit(mock_sleep, mock_anthropic_cls):
-    import anthropic as _anthropic
+def test_analyzer_retries_on_rate_limit(mock_sleep, mock_openai_cls):
+    import openai as _openai
+
     mock_client = MagicMock()
-    mock_client.messages.create.side_effect = [
-        _anthropic.RateLimitError("rate limit", response=MagicMock(), body={}),
-        MagicMock(content=[MagicMock(text=json.dumps(MOCK_RESPONSE))]),
+    choice = MagicMock()
+    choice.message.content = json.dumps(MOCK_RESPONSE)
+    mock_client.chat.completions.create.side_effect = [
+        _openai.RateLimitError("rate limit", response=MagicMock(status_code=429), body={}),
+        MagicMock(choices=[choice]),
     ]
-    mock_anthropic_cls.return_value = mock_client
+    mock_openai_cls.return_value = mock_client
 
     analyzer = SemanticAnalyzer(api_key="test-key")
     result = analyzer.analyze(
