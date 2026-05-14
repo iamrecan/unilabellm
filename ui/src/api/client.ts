@@ -113,6 +113,48 @@ export const sourcesApi = {
     api.post<DatasetSource>('/sources/scan', { path, name }).then(r => r.data),
 }
 
+// ── Validation (CLIP) ─────────────────────────────────────────────────────────
+
+export interface LabelScore {
+  class_name: string
+  confidence: number
+  raw_similarity: number
+}
+
+export interface ImageValidationResult {
+  image_path: string
+  source_name: string
+  assigned_labels: string[]
+  top_class: string
+  top_confidence: number
+  is_suspicious: boolean
+  suspicion_reason: string
+  scores: LabelScore[]
+}
+
+export interface ValidationStatus {
+  status: 'running' | 'done' | 'failed'
+  phase: string
+  done: number
+  total: number
+  // populated when done
+  total_images: number
+  suspicious_count: number
+  suspicious_ratio: number
+  threshold: number
+  results: ImageValidationResult[]
+  error: string
+}
+
+export const validationApi = {
+  start: (id: string, threshold = 0.25, max_images_per_source = 100) =>
+    api.post<ValidationStatus>(`/sessions/${id}/validate`, { threshold, max_images_per_source }).then(r => r.data),
+  status: (id: string) =>
+    api.get<ValidationStatus>(`/sessions/${id}/validate/status`).then(r => r.data),
+  suspicious: (id: string, limit = 200) =>
+    api.get<ImageValidationResult[]>(`/sessions/${id}/validate/suspicious`, { params: { limit } }).then(r => r.data),
+}
+
 export interface DirEntry {
   name: string
   path: string

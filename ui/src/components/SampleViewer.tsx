@@ -1,19 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
-import { sessionsApi, ImageSample } from '../api/client'
+import { sessionsApi, ImageSample, ImageValidationResult } from '../api/client'
 import { HudBox, hudColor } from './HudOverlay'
 import { LabelEditor } from './LabelEditor'
 
 interface Props {
   sessionId: string
   classNames: string[]
+  /** Pass validation results to highlight suspicious images */
+  validationResults?: ImageValidationResult[]
+  /** Current CLIP threshold — used to recompute suspicious set on slider change */
+  validationThreshold?: number
 }
 
-export function SampleViewer({ sessionId, classNames }: Props) {
+type FilterMode = 'all' | 'suspicious'
+
+export function SampleViewer({ sessionId, classNames, validationResults, validationThreshold = 0.25 }: Props) {
   const [open, setOpen]         = useState(false)
   const [samples, setSamples]   = useState<ImageSample[]>([])
   const [loading, setLoading]   = useState(false)
   const [selected, setSelected] = useState<ImageSample | null>(null)
   const [editing, setEditing]   = useState<ImageSample | null>(null)
+  const [filter, setFilter]     = useState<FilterMode>('all')
+
+  // Build a lookup: image_path → validation result (recomputed on threshold change)
+  const validationMap = new Map<string, ImageValidationResult>(
+    (validationResults ?? []).map(r => [r.image_path, r])
+  )
+  const suspiciousSet = new Set<string>(
+    (validationResults ?? [])
+      .filter(r => r.scores.some(s => s.class_name === r.assigned_labels[0] && s.confidence < validationThreshold)
+        || r.is_suspicious)
+      .map(r => r.image_path)
+  )
 
   const load = async () => {
     setLoading(true)
@@ -22,7 +40,6 @@ export function SampleViewer({ sessionId, classNames }: Props) {
   }
 
   const handleOpen = () => { setOpen(true); if (!samples.length) load() }
-
   const handleEditorSaved = () => { setEditing(null); load() }
 
   useEffect(() => {
@@ -33,11 +50,28 @@ export function SampleViewer({ sessionId, classNames }: Props) {
     return () => window.removeEventListener('keydown', fn)
   }, [])
 
+  // Filtered samples for display
+  const displayedSamples = filter === 'suspicious'
+    ? samples.filter(s => suspiciousSet.has(s.image_path))
+    : samples
+
+  const suspiciousInSamples = samples.filter(s => suspiciousSet.has(s.image_path)).length
+  const hasValidation = validationResults && validationResults.length > 0
+
   return (
     <>
       <button className="btn btn-ghost" onClick={handleOpen}
               style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}>
         Preview Labels
+        {hasValidation && suspiciousInSamples > 0 && (
+          <span style={{
+            marginLeft: 8, fontSize: 11, padding: '1px 6px', borderRadius: 10,
+            background: 'rgba(238,0,0,0.15)', color: 'var(--red)',
+            border: '1px solid rgba(238,0,0,0.3)', fontWeight: 600,
+          }}>
+            {suspiciousInSamples} ⚠
+          </span>
+        )}
       </button>
 
       {/* ── Grid modal ── */}
@@ -50,6 +84,7 @@ export function SampleViewer({ sessionId, classNames }: Props) {
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}
         >
+          {/* Header */}
           <div style={{
             height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '0 24px', borderBottom: '1px solid var(--border)',
@@ -57,6 +92,27 @@ export function SampleViewer({ sessionId, classNames }: Props) {
           }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Label Preview</span>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+
+              {/* Filter toggle — only show when we have validation results */}
+              {hasValidation && (
+                <div style={{ display: 'flex', borderRadius: 'var(--radius)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                  {(['all', 'suspicious'] as FilterMode[]).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => setFilter(mode)}
+                      style={{
+                        padding: '4px 12px', fontSize: 12, height: 30, borderRadius: 0,
+                        background: filter === mode ? 'var(--accent)' : 'transparent',
+                        color: filter === mode ? '#fff' : 'var(--text-dim)',
+                        borderRight: mode === 'all' ? '1px solid var(--border)' : 'none',
+                      }}
+                    >
+                      {mode === 'all' ? 'All' : `Suspicious (${suspiciousSet.size})`}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <button className="btn btn-ghost" onClick={load} disabled={loading}
                       style={{ fontSize: 12, height: 30 }}>
                 {loading ? 'Loading…' : 'Resample'}
@@ -87,12 +143,20 @@ export function SampleViewer({ sessionId, classNames }: Props) {
             {loading && !samples.length && (
               <div style={{ textAlign: 'center', color: 'var(--text-dim)', paddingTop: 60 }}>Loading samples…</div>
             )}
-            {!loading && samples.length === 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--text-dim)', paddingTop: 60 }}>No images found.</div>
+            {!loading && displayedSamples.length === 0 && (
+              <div style={{ textAlign: 'center', color: 'var(--text-dim)', paddingTop: 60 }}>
+                {filter === 'suspicious' ? 'No suspicious images in current sample. Try Resample.' : 'No images found.'}
+              </div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-              {samples.map((s, i) => (
-                <ImageCard key={i} sample={s} onClick={() => setSelected(s)} />
+              {displayedSamples.map((s, i) => (
+                <ImageCard
+                  key={i}
+                  sample={s}
+                  validationResult={validationMap.get(s.image_path)}
+                  isSuspicious={suspiciousSet.has(s.image_path)}
+                  onClick={() => setSelected(s)}
+                />
               ))}
             </div>
           </div>
@@ -111,6 +175,19 @@ export function SampleViewer({ sessionId, classNames }: Props) {
         >
           <div onClick={e => e.stopPropagation()}
                style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+
+            {/* Suspicious reason banner */}
+            {suspiciousSet.has(selected.image_path) && (
+              <div style={{
+                position: 'absolute', top: -60, left: 0, right: 0,
+                background: 'rgba(238,0,0,0.15)', border: '1px solid rgba(238,0,0,0.3)',
+                borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 12, color: 'var(--red)',
+                maxWidth: '90vw',
+              }}>
+                ⚠ {validationMap.get(selected.image_path)?.suspicion_reason}
+              </div>
+            )}
+
             <AnnotatedImageHud sample={selected} maxHeight="78vh" />
 
             <button onClick={() => setSelected(null)} style={{
@@ -125,6 +202,11 @@ export function SampleViewer({ sessionId, classNames }: Props) {
             >
               ✎ Edit Labels
             </button>
+
+            {/* CLIP score breakdown */}
+            {validationMap.has(selected.image_path) && (
+              <ScoreBar result={validationMap.get(selected.image_path)!} threshold={validationThreshold} />
+            )}
 
             <div style={{ position: 'absolute', bottom: -26, left: 0, fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--mono)' }}>
               {selected.source_name} · {selected.annotations.length} annotations
@@ -148,30 +230,102 @@ export function SampleViewer({ sessionId, classNames }: Props) {
 }
 
 // ── Thumbnail card ────────────────────────────────────────────────────────────
-function ImageCard({ sample, onClick }: { sample: ImageSample; onClick: () => void }) {
+function ImageCard({
+  sample, validationResult, isSuspicious, onClick,
+}: {
+  sample: ImageSample
+  validationResult?: ImageValidationResult
+  isSuspicious: boolean
+  onClick: () => void
+}) {
   return (
     <div
       onClick={onClick}
       style={{
-        border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+        border: `1px solid ${isSuspicious ? 'rgba(238,0,0,0.5)' : 'var(--border)'}`,
+        borderRadius: 'var(--radius)',
         overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s',
+        position: 'relative',
       }}
-      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-hover)')}
-      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = isSuspicious ? 'rgba(238,0,0,0.8)' : 'var(--border-hover)')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = isSuspicious ? 'rgba(238,0,0,0.5)' : 'var(--border)')}
     >
+      {/* Suspicious badge */}
+      {isSuspicious && (
+        <div style={{
+          position: 'absolute', top: 6, right: 6, zIndex: 10,
+          background: 'rgba(238,0,0,0.85)', color: '#fff',
+          fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 8,
+          backdropFilter: 'blur(4px)',
+        }}>
+          ⚠ SUSPICIOUS
+        </div>
+      )}
+
       <div style={{ background: '#111' }}>
         <AnnotatedImageHud sample={sample} maxHeight="200px" />
       </div>
+
       <div style={{
-        padding: '8px 10px', background: 'var(--surface)',
+        padding: '8px 10px',
+        background: isSuspicious ? 'rgba(238,0,0,0.06)' : 'var(--surface)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        gap: 6,
       }}>
-        <span style={{ fontSize: 11, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
           {sample.source_name}
         </span>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0, marginLeft: 8 }}>
+        {validationResult && (
+          <span style={{
+            fontSize: 10, fontFamily: 'var(--mono)', flexShrink: 0,
+            color: isSuspicious ? 'var(--red)' : 'var(--text-muted)',
+          }}>
+            {(validationResult.top_confidence * 100).toFixed(0)}%
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
           {sample.annotations.length} box{sample.annotations.length !== 1 ? 'es' : ''}
         </span>
+      </div>
+    </div>
+  )
+}
+
+// ── CLIP score breakdown bar (shown in lightbox) ──────────────────────────────
+function ScoreBar({ result, threshold }: { result: ImageValidationResult; threshold: number }) {
+  const sorted = [...result.scores].sort((a, b) => b.confidence - a.confidence).slice(0, 5)
+  return (
+    <div style={{
+      position: 'absolute', bottom: -110, left: 0, right: 0,
+      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+      border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+      padding: '8px 12px', fontSize: 11,
+    }}>
+      <div style={{ color: 'var(--text-dim)', marginBottom: 6, fontWeight: 500 }}>CLIP confidence</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {sorted.map(s => {
+          const pct = Math.round(s.confidence * 100)
+          const isBelowThreshold = result.assigned_labels.includes(s.class_name) && s.confidence < threshold
+          return (
+            <div key={s.class_name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                fontFamily: 'var(--mono)', width: 90, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis',
+                color: result.assigned_labels.includes(s.class_name) ? 'var(--text)' : 'var(--text-muted)',
+              }}>{s.class_name}</span>
+              <div style={{ flex: 1, height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 3,
+                  width: `${pct}%`,
+                  background: isBelowThreshold ? 'var(--red)' : s.class_name === result.top_class ? 'var(--accent)' : 'var(--text-muted)',
+                  transition: 'width 0.3s',
+                }} />
+              </div>
+              <span style={{ fontFamily: 'var(--mono)', width: 32, textAlign: 'right', color: isBelowThreshold ? 'var(--red)' : 'var(--text-dim)' }}>
+                {pct}%
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

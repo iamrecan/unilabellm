@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { CanonicalClass, HarmonizationSession, sessionsApi } from './api/client'
+import { CanonicalClass, HarmonizationSession, ImageValidationResult, sessionsApi } from './api/client'
 import { AddSourcePanel } from './components/AddSourcePanel'
 import { ExportPanel } from './components/ExportPanel'
 import { HarmonizationView } from './components/HarmonizationView'
@@ -7,6 +7,7 @@ import { InferencePanel } from './components/InferencePanel'
 import { NewSessionForm } from './components/NewSessionForm'
 import { SampleViewer } from './components/SampleViewer'
 import { SessionList } from './components/SessionList'
+import { ValidationPanel } from './components/ValidationPanel'
 
 type View = 'list' | 'new' | 'session' | 'inference'
 
@@ -22,8 +23,10 @@ export default function App() {
   const [sessions, setSessions]           = useState<HarmonizationSession[]>([])
   const [activeSession, setActiveSession] = useState<HarmonizationSession | null>(null)
   const [classes, setClasses]             = useState<CanonicalClass[]>([])
-  const [confirming, setConfirming]       = useState(false)
-  const [saveStatus, setSaveStatus]       = useState<'saved' | 'error' | null>(null)
+  const [confirming, setConfirming]           = useState(false)
+  const [saveStatus, setSaveStatus]           = useState<'saved' | 'error' | null>(null)
+  const [validationResults, setValidationResults] = useState<ImageValidationResult[]>([])
+  const [validationThreshold, setValidationThreshold] = useState(0.25)
 
   const loadSessions = useCallback(async () => {
     try { setSessions(await sessionsApi.list()) } catch {}
@@ -35,6 +38,7 @@ export default function App() {
     const s = await sessionsApi.get(id)
     setActiveSession(s)
     setClasses(s.canonical_classes)
+    setValidationResults([])
     setView('session')
   }
 
@@ -212,12 +216,27 @@ export default function App() {
 
               <AddSourcePanel sessionId={activeSession.id} onAdded={handleSourceAdded} />
 
+              {/* CLIP Validation */}
+              {activeSession.status !== 'pending' && (
+                <div style={{ marginTop: 12 }}>
+                  <ValidationPanel
+                    sessionId={activeSession.id}
+                    onResultsReady={(results, threshold) => {
+                      setValidationResults(results)
+                      setValidationThreshold(threshold)
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Label preview — available in reviewing + confirmed + exported */}
               {activeSession.status !== 'pending' && (
                 <div style={{ marginTop: 12 }}>
                   <SampleViewer
                     sessionId={activeSession.id}
                     classNames={activeSession.canonical_classes.map(c => c.name)}
+                    validationResults={validationResults}
+                    validationThreshold={validationThreshold}
                   />
                 </div>
               )}
