@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { CanonicalClass, HarmonizationSession, sessionsApi } from './api/client'
+import { CanonicalClass, DatasetSource, HarmonizationSession, sessionsApi } from './api/client'
 import { AddSourcePanel } from './components/AddSourcePanel'
 import { ExportPanel } from './components/ExportPanel'
 import { HarmonizationView } from './components/HarmonizationView'
@@ -164,6 +164,8 @@ export default function App() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 32, alignItems: 'start' }}>
 
             <HarmonizationView
+              sessionId={activeSession.id}
+              sources={activeSession.sources}
               classes={classes}
               onChange={handleClassesChange}
               onConfirm={handleConfirm}

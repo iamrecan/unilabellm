@@ -67,6 +67,7 @@ build/
 # --- Jupyter ---
 .ipynb_checkpoints/
 *-checkpoint.ipynb
+*.ipynb
 
 # --- Logs ---
 *.log

@@ -17,9 +17,11 @@ interface HudBoxProps {
   dimmed?: boolean
   interactive?: boolean
   onClick?: (e: React.MouseEvent) => void
+  onMouseEnter?: () => void
+  onMouseLeave?: () => void
 }
 
-export function HudBox({ ann, imgW, imgH, trackId, selected, dimmed, interactive, onClick }: HudBoxProps) {
+export function HudBox({ ann, imgW, imgH, trackId, selected, dimmed, interactive, onClick, onMouseEnter, onMouseLeave }: HudBoxProps) {
   const color = hudColor(ann.class_id)
   const bx = (ann.cx - ann.w / 2) * imgW
   const by = (ann.cy - ann.h / 2) * imgH
@@ -49,10 +51,13 @@ export function HudBox({ ann, imgW, imgH, trackId, selected, dimmed, interactive
   return (
     <g
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
         cursor: interactive ? 'pointer' : 'default',
-        opacity: dimmed ? 0.28 : 1,
-        pointerEvents: interactive ? 'auto' : 'none',
+        opacity: dimmed ? 0.2 : 1,
+        transition: 'opacity 0.12s ease',
+        pointerEvents: (interactive || onMouseEnter) ? 'auto' : 'none',
       }}
     >
       {/* Selection tint */}

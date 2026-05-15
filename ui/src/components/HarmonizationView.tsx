@@ -1,10 +1,13 @@
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { useState, useCallback } from 'react'
-import { CanonicalClass } from '../api/client'
+import { CanonicalClass, DatasetSource } from '../api/client'
 import { AliasChip } from './AliasChip'
 import { CanonicalClassCard } from './CanonicalClassCard'
+import { DatasetStatsPanel } from './DatasetStats'
 
 interface Props {
+  sessionId: string
+  sources: DatasetSource[]
   classes: CanonicalClass[]
   onChange: (classes: CanonicalClass[]) => void
   onConfirm: () => void
@@ -12,9 +15,10 @@ interface Props {
   readOnly?: boolean
 }
 
-export function HarmonizationView({ classes, onChange, onConfirm, confirming, readOnly }: Props) {
+export function HarmonizationView({ sessionId, classes, onChange, onConfirm, confirming, readOnly }: Props) {
   const [activeAlias, setActiveAlias] = useState<string | null>(null)
   const [newClassName, setNewClassName] = useState('')
+  const [viewTab, setViewTab] = useState<'classes' | 'stats'>('classes')
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const confidenceMap: Record<string, number> = {}
@@ -63,54 +67,76 @@ export function HarmonizationView({ classes, onChange, onConfirm, confirming, re
               Drag aliases between classes · Double-click a name to rename
             </p>
           </div>
-          {!readOnly && (
-            <button
-              className="btn btn-primary"
-              onClick={onConfirm}
-              disabled={confirming || classes.length === 0}
-            >
-              {confirming ? 'Saving…' : 'Confirm & Save'}
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Tab switcher */}
+            <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
+              {(['classes', 'stats'] as const).map((tab, i, arr) => (
+                <button key={tab} onClick={() => setViewTab(tab)} style={{
+                  padding: '0 14px', fontSize: 12, height: 30, borderRadius: 0,
+                  background: viewTab === tab ? 'var(--surface2)' : 'transparent',
+                  color: viewTab === tab ? 'var(--text)' : 'var(--text-dim)',
+                  borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
+                }}>
+                  {tab === 'classes' ? 'Classes' : '◫ Stats'}
+                </button>
+              ))}
+            </div>
+            {/* Confirm button — only in Classes tab */}
+            {!readOnly && viewTab === 'classes' && (
+              <button
+                className="btn btn-primary"
+                onClick={onConfirm}
+                disabled={confirming || classes.length === 0}
+              >
+                {confirming ? 'Saving…' : 'Confirm & Save'}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Warning for empty classes */}
-        {!readOnly && emptyClasses.length > 0 && (
-          <div style={{ fontSize: 12, color: 'var(--yellow)', marginBottom: 12, padding: '8px 12px', border: '1px solid rgba(245,166,35,0.25)', borderRadius: 'var(--radius)', background: 'var(--yellow-dim)' }}>
-            {emptyClasses.length} class{emptyClasses.length > 1 ? 'es have' : ' has'} no aliases:{' '}
-            {emptyClasses.map(c => c.name).join(', ')}
-          </div>
-        )}
+        {viewTab === 'stats' ? (
+          <DatasetStatsPanel sessionId={sessionId} classNames={classes.map(c => c.name)} />
+        ) : (
+          <>
+            {/* Warning for empty classes */}
+            {!readOnly && emptyClasses.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--yellow)', marginBottom: 12, padding: '8px 12px', border: '1px solid rgba(245,166,35,0.25)', borderRadius: 'var(--radius)', background: 'var(--yellow-dim)' }}>
+                {emptyClasses.length} class{emptyClasses.length > 1 ? 'es have' : ' has'} no aliases:{' '}
+                {emptyClasses.map(c => c.name).join(', ')}
+              </div>
+            )}
 
-        {/* Class cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-          {classes.map(cc => (
-            <CanonicalClassCard
-              key={cc.id}
-              cc={cc}
-              onRename={handleRename}
-              onRemoveAlias={handleRemoveAlias}
-              onRemoveClass={handleRemoveClass}
-              confidenceMap={confidenceMap}
-              readOnly={readOnly}
-            />
-          ))}
-        </div>
+            {/* Class cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+              {classes.map(cc => (
+                <CanonicalClassCard
+                  key={cc.id}
+                  cc={cc}
+                  onRename={handleRename}
+                  onRemoveAlias={handleRemoveAlias}
+                  onRemoveClass={handleRemoveClass}
+                  confidenceMap={confidenceMap}
+                  readOnly={readOnly}
+                />
+              ))}
+            </div>
 
-        {/* Add class */}
-        {!readOnly && (
-          <div style={{ display: 'flex', gap: 8, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-            <input
-              placeholder="New class name…"
-              value={newClassName}
-              onChange={e => setNewClassName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAddClass()}
-              style={{ flex: 1 }}
-            />
-            <button className="btn btn-ghost" onClick={handleAddClass} style={{ flexShrink: 0 }}>
-              Add
-            </button>
-          </div>
+            {/* Add class */}
+            {!readOnly && (
+              <div style={{ display: 'flex', gap: 8, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                <input
+                  placeholder="New class name…"
+                  value={newClassName}
+                  onChange={e => setNewClassName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddClass()}
+                  style={{ flex: 1 }}
+                />
+                <button className="btn btn-ghost" onClick={handleAddClass} style={{ flexShrink: 0 }}>
+                  Add
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

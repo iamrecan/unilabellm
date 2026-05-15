@@ -75,6 +75,20 @@ export interface ImageSample {
   annotations: AnnotationBox[]
 }
 
+export interface SourceStat {
+  name: string
+  image_count: number
+  label_count: number
+  class_counts: Record<string, number>
+}
+
+export interface DatasetStats {
+  total_images: number
+  total_labels: number
+  source_stats: SourceStat[]
+  class_counts: Record<string, number>
+}
+
 export const sessionsApi = {
   list: () => api.get<HarmonizationSession[]>('/sessions').then(r => r.data),
   get: (id: string) => api.get<HarmonizationSession>(`/sessions/${id}`).then(r => r.data),
@@ -99,6 +113,8 @@ export const sessionsApi = {
     api.post<HarmonizationSession>(`/sessions/${id}/annotations`, { image_path, annotations }).then(r => r.data),
   clearAnnotations: (id: string, image_path: string) =>
     api.delete<HarmonizationSession>(`/sessions/${id}/annotations`, { params: { image_path } }).then(r => r.data),
+  stats: (id: string) =>
+    api.get<DatasetStats>(`/sessions/${id}/stats`).then(r => r.data),
 }
 
 export const inferenceApi = {
@@ -111,6 +127,71 @@ export const inferenceApi = {
 export const sourcesApi = {
   scan: (path: string, name?: string) =>
     api.post<DatasetSource>('/sources/scan', { path, name }).then(r => r.data),
+}
+
+// ── Validation (CLIP) ─────────────────────────────────────────────────────────
+
+export interface LabelScore {
+  class_name: string
+  confidence: number
+  raw_similarity: number
+}
+
+export interface BoxValidation {
+  box_index: number
+  class_name: string
+  cx: number; cy: number; w: number; h: number
+  assigned_confidence: number
+  top_class: string
+  top_confidence: number
+  scores: LabelScore[]
+  is_suspicious: boolean
+}
+
+export interface DetectedBox {
+  class_name: string
+  class_id: number
+  cx: number; cy: number; w: number; h: number
+  confidence: number
+}
+
+export interface ImageValidationResult {
+  image_path: string
+  source_name: string
+  box_validations: BoxValidation[]   // per-box crop results
+  scores: LabelScore[]               // aggregate avg across boxes
+  assigned_labels: string[]
+  top_class: string
+  top_confidence: number
+  is_suspicious: boolean
+  suspicion_reason: string
+}
+
+export interface ValidationStatus {
+  status: 'running' | 'done' | 'failed'
+  phase: string
+  done: number
+  total: number
+  // populated when done
+  total_images: number
+  suspicious_count: number
+  suspicious_ratio: number
+  threshold: number
+  results: ImageValidationResult[]
+  error: string
+}
+
+export const validationApi = {
+  start: (id: string, backend: 'owl-vit' | 'siglip' | 'clip' = 'owl-vit', threshold?: number, max_images_per_source = 100) =>
+    api.post<ValidationStatus>(`/sessions/${id}/validate`, { backend, threshold, max_images_per_source }).then(r => r.data),
+  status: (id: string) =>
+    api.get<ValidationStatus>(`/sessions/${id}/validate/status`).then(r => r.data),
+  suspicious: (id: string, limit = 200) =>
+    api.get<ImageValidationResult[]>(`/sessions/${id}/validate/suspicious`, { params: { limit } }).then(r => r.data),
+  validateImage: (id: string, image_path: string, backend: 'owl-vit' | 'siglip' | 'clip' = 'owl-vit', threshold?: number) =>
+    api.post<ImageValidationResult>(`/sessions/${id}/validate/image`, { image_path, backend, threshold }).then(r => r.data),
+  detectBoxes: (id: string, image_path: string, backend = 'owl-vit', threshold = 0.05) =>
+    api.post<DetectedBox[]>(`/sessions/${id}/detect-boxes`, { image_path, backend, threshold }).then(r => r.data),
 }
 
 export interface DirEntry {

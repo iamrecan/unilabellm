@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import export, filesystem, inference, sessions, sources, workspace
+from api.routes import export, filesystem, inference, sessions, sources, validation, workspace
 
 app = FastAPI(
     title="unilabellm API",
@@ -23,6 +23,7 @@ app.include_router(export.router)
 app.include_router(workspace.router)
 app.include_router(filesystem.router)
 app.include_router(inference.router)
+app.include_router(validation.router)
 
 
 @app.get("/health")

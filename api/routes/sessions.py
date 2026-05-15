@@ -317,3 +317,75 @@ def delete_session(session_id: str):
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
     session_mgr.delete_session(session_id)
+
+
+# ── Dataset statistics ────────────────────────────────────────────────────────
+
+class SourceStat(BaseModel):
+    name: str
+    image_count: int
+    label_count: int
+    class_counts: dict[str, int]
+
+class DatasetStatsOut(BaseModel):
+    total_images: int
+    total_labels: int
+    source_stats: list[SourceStat]
+    class_counts: dict[str, int]
+
+@router.get("/{session_id}/stats", response_model=DatasetStatsOut)
+def get_dataset_stats(session_id: str):
+    """Return per-canonical-class annotation counts across all sources."""
+    try:
+        session = session_mgr.load_session(session_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
+
+    from pathlib import Path
+
+    alias_to_canonical: dict[str, str] = {}
+    for cc in session.canonical_classes:
+        for alias in cc.aliases:
+            alias_to_canonical[alias] = cc.name
+
+    class_counts: dict[str, int] = {cc.name: 0 for cc in session.canonical_classes}
+    source_stats_list = []
+
+    for source in session.sources:
+        root = Path(source.path)
+        src_counts: dict[str, int] = {cc.name: 0 for cc in session.canonical_classes}
+
+        for txt_file in root.rglob("*.txt"):
+            try:
+                for line in txt_file.read_text(encoding="utf-8", errors="ignore").strip().splitlines():
+                    parts = line.split()
+                    if len(parts) < 5:
+                        continue
+                    try:
+                        class_id = int(parts[0])
+                        # Quick sanity check: 4 floats follow
+                        _ = [float(p) for p in parts[1:5]]
+                    except ValueError:
+                        continue
+                    if class_id < len(source.classes):
+                        raw = source.classes[class_id]
+                        canonical = alias_to_canonical.get(raw, raw)
+                        if canonical in class_counts:
+                            class_counts[canonical] += 1
+                            src_counts[canonical] += 1
+            except Exception:
+                pass
+
+        source_stats_list.append(SourceStat(
+            name=source.name,
+            image_count=source.image_count,
+            label_count=source.label_count,
+            class_counts=src_counts,
+        ))
+
+    return DatasetStatsOut(
+        total_images=sum(s.image_count for s in session.sources),
+        total_labels=sum(s.label_count for s in session.sources),
+        source_stats=source_stats_list,
+        class_counts=class_counts,
+    )
