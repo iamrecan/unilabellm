@@ -184,9 +184,12 @@ def test_validate_all_good(canonical_classes, sample_sources):
 
 
 def test_validate_unmapped(canonical_classes, sample_sources):
+    # Unmapped labels are treated as warnings, not hard errors — the user may have
+    # intentionally dropped garbage classes during harmonization review.
+    # Only alias conflicts (same alias in two classes) are hard errors.
     sample_sources[0].classes.append("drone")
     result = validate(canonical_classes, sample_sources)
-    assert not result.valid
+    assert result.valid          # still valid — unmapped is a warning, not a blocker
     assert "drone" in result.unmapped
     assert len(result.warnings) > 0
 

@@ -12,8 +12,8 @@ Speed: ~60-100ms per crop on CPU
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import torch
 from PIL import Image
@@ -199,14 +199,14 @@ class SigLIPScorer:
         annotations: list,
     ) -> ImageValidationResult:
         img = Image.open(img_path).convert("RGB")
-        W, H = img.size
+        img_w, img_h = img.size
 
         box_validations: list[BoxValidation] = []
         score_acc: dict[str, list[float]] = {cn: [] for cn in class_names}
 
         target_annotations = annotations or [(-1, "", 0.5, 0.5, 1.0, 1.0)]
         for box_index, class_name, cx, cy, bw, bh in target_annotations:
-            crop = _crop_box(img, W, H, cx, cy, bw, bh) or img
+            crop = _crop_box(img, img_w, img_h, cx, cy, bw, bh) or img
             scores, top_class, top_conf = self._score_crop(
                 model, processor, crop, class_names, text_emb,
             )

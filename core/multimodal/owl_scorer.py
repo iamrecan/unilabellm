@@ -11,8 +11,8 @@ Speed: ~150-300ms per image on CPU
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import torch
 from PIL import Image
@@ -158,7 +158,7 @@ class OWLScorer:
         model = model.to(self.device)
 
         img = Image.open(image_path).convert("RGB")
-        W, H = img.size
+        img_w, img_h = img.size
         text_queries = [f"a photo of a {cn}" for cn in class_names]
 
         inputs = processor(text=[text_queries], images=img, return_tensors="pt")
@@ -167,7 +167,7 @@ class OWLScorer:
         with torch.no_grad():
             outputs = model(**inputs)
 
-        target_sizes = torch.Tensor([[H, W]]).to(self.device)
+        target_sizes = torch.Tensor([[img_h, img_w]]).to(self.device)
         det = processor.post_process_object_detection(
             outputs=outputs, threshold=threshold, target_sizes=target_sizes,
         )[0]
@@ -175,10 +175,10 @@ class OWLScorer:
         results = []
         for score, label, box in zip(det["scores"], det["labels"], det["boxes"]):
             x1, y1, x2, y2 = box.tolist()
-            cx = ((x1 + x2) / 2) / W
-            cy = ((y1 + y2) / 2) / H
-            bw = (x2 - x1) / W
-            bh = (y2 - y1) / H
+            cx = ((x1 + x2) / 2) / img_w
+            cy = ((y1 + y2) / 2) / img_h
+            bw = (x2 - x1) / img_w
+            bh = (y2 - y1) / img_h
             results.append({
                 "class_name": class_names[int(label)],
                 "class_id": int(label),
@@ -252,7 +252,7 @@ class OWLScorer:
         annotations: list,
     ) -> ImageValidationResult:
         img = Image.open(img_path).convert("RGB")
-        W, H = img.size
+        img_w, img_h = img.size
 
         box_validations: list[BoxValidation] = []
         score_acc: dict[str, list[float]] = {cn: [] for cn in class_names}
@@ -266,7 +266,7 @@ class OWLScorer:
                 score_acc[s.class_name].append(s.confidence)
         else:
             for box_index, class_name, cx, cy, bw, bh in annotations:
-                crop = _crop_box(img, W, H, cx, cy, bw, bh) or img
+                crop = _crop_box(img, img_w, img_h, cx, cy, bw, bh) or img
                 scores, top_class, top_conf = self._score_crop(
                     model, processor, crop, class_names, text_queries,
                 )

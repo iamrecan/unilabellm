@@ -31,7 +31,8 @@ class LLMAnalysisResult:
 
 class SemanticAnalyzer:
     def __init__(self, api_key: str | None = None) -> None:
-        key = api_key or settings.openrouter_api_key
+        # Explicit empty string means "no key" — don't fall back to settings
+        key = api_key if api_key is not None else settings.openrouter_api_key
         if not key:
             raise ValueError(
                 "OPENROUTER_API_KEY is not set. Add it to .env or set the environment variable."

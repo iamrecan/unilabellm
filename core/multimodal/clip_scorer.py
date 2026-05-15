@@ -11,15 +11,18 @@ Speed: ~50-80ms per crop on CPU
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import torch
 from PIL import Image
 from transformers import CLIPModel, CLIPProcessor
 
 from .base import (
-    BoxValidation, ImageValidationResult, LabelScore, ValidationRun,
+    BoxValidation,
+    ImageValidationResult,
+    LabelScore,
+    ValidationRun,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,14 +146,14 @@ class CLIPScorer:
                      class_names: list[str], text_emb: torch.Tensor,
                      annotations: list) -> ImageValidationResult:
         img = Image.open(img_path).convert("RGB")
-        W, H = img.size
+        img_w, img_h = img.size
 
         box_validations: list[BoxValidation] = []
         score_acc: dict[str, list[float]] = {cn: [] for cn in class_names}
 
         target_annotations = annotations or [(-1, "", 0.5, 0.5, 1.0, 1.0)]  # full image fallback
         for box_index, class_name, cx, cy, bw, bh in target_annotations:
-            crop = _crop_box(img, W, H, cx, cy, bw, bh) or img
+            crop = _crop_box(img, img_w, img_h, cx, cy, bw, bh) or img
             scores, top_class, top_conf = self._score_crop(model, processor, crop, class_names, text_emb)
             conf_map = {s.class_name: s.confidence for s in scores}
             assigned_conf = conf_map.get(class_name, 0.0) if class_name else 0.0
@@ -171,13 +174,13 @@ class CLIPScorer:
 
 # ── Shared helpers (used by multiple scorers) ─────────────────────────────────
 
-def _crop_box(img: Image.Image, W: int, H: int,
+def _crop_box(img: Image.Image, img_w: int, img_h: int,
               cx: float, cy: float, bw: float, bh: float,
               pad: int = 6) -> Image.Image | None:
-    x1 = max(0, int((cx - bw / 2) * W) - pad)
-    y1 = max(0, int((cy - bh / 2) * H) - pad)
-    x2 = min(W, int((cx + bw / 2) * W) + pad)
-    y2 = min(H, int((cy + bh / 2) * H) + pad)
+    x1 = max(0, int((cx - bw / 2) * img_w) - pad)
+    y1 = max(0, int((cy - bh / 2) * img_h) - pad)
+    x2 = min(img_w, int((cx + bw / 2) * img_w) + pad)
+    y2 = min(img_h, int((cy + bh / 2) * img_h) + pad)
     if x2 - x1 < _MIN_CROP_PX or y2 - y1 < _MIN_CROP_PX:
         return None
     return img.crop((x1, y1, x2, y2))
