@@ -6,9 +6,9 @@ Any scorer (CLIP, OWL-ViT, Florence-2, …) must implement the
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol, Callable
-
+from typing import Protocol
 
 # ── Shared data classes ───────────────────────────────────────────────────────
 

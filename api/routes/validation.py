@@ -102,7 +102,7 @@ def start_validation(session_id: str, body: ValidateRequest):
 
     def _run() -> None:
         try:
-            from core.multimodal import get_scorer, DEFAULT_THRESHOLDS
+            from core.multimodal import DEFAULT_THRESHOLDS, get_scorer
 
             threshold = body.threshold if body.threshold is not None \
                         else DEFAULT_THRESHOLDS.get(body.backend, 0.10)
@@ -278,9 +278,10 @@ def validate_single_image(session_id: str, body: SingleImageRequest):
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
 
-    from core.multimodal import get_scorer, DEFAULT_THRESHOLDS
-    from core.multimodal.clip_scorer import _get_annotations
     from pathlib import Path
+
+    from core.multimodal import DEFAULT_THRESHOLDS, get_scorer
+    from core.multimodal.clip_scorer import _get_annotations
 
     class_names = [cc.name for cc in session.canonical_classes]
     if not class_names:
