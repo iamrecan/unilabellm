@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, type WheelEvent as RWheelEvent } from 'react'
 import { sessionsApi, validationApi, ImageSample, ImageValidationResult, DetectedBox } from '../api/client'
-import { HudBox, hudColor } from './HudOverlay'
+import { HudBox, hudColor, BoxStyle } from './HudOverlay'
 import { LabelEditor } from './LabelEditor'
 
 interface Props {
@@ -28,6 +28,7 @@ export function SampleViewer({ sessionId, classNames }: Props) {
   const [clipError, setClipError]         = useState<string | null>(null)
   const [showClip, setShowClip]           = useState(true)
   const [backend, setBackend]             = useState<'owl-vit' | 'siglip' | 'clip'>('owl-vit')
+  const [boxStyle, setBoxStyle]           = useState<BoxStyle>('corners')
 
   // ── Per-image lightbox state ───────────────────────────────────────────────
   const [imgValidating, setImgValidating] = useState(false)
@@ -505,6 +506,32 @@ export function SampleViewer({ sessionId, classNames }: Props) {
                 </button>
               )}
 
+              {/* Box style picker */}
+              <div style={{
+                display: 'flex', alignItems: 'center',
+                border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden',
+                flexShrink: 0,
+              }}>
+                {(['corners', 'box', 'minimal', 'filled'] as BoxStyle[]).map((s, i) => {
+                  const icons: Record<BoxStyle, string> = { corners: '⌐¬', box: '▭', minimal: '◻', filled: '◼' }
+                  const tips:  Record<BoxStyle, string> = { corners: 'Corners (HUD)', box: 'Full box', minimal: 'Minimal', filled: 'Filled' }
+                  const active = boxStyle === s
+                  return (
+                    <button key={s} onClick={() => setBoxStyle(s)} title={tips[s]}
+                      style={{
+                        height: 28, padding: '0 9px', fontSize: 12, border: 'none',
+                        borderLeft: i > 0 ? '1px solid var(--border)' : 'none',
+                        background: active ? 'rgba(99,179,237,0.18)' : 'transparent',
+                        color: active ? '#63b3ed' : 'var(--text-muted)',
+                        cursor: 'pointer', transition: 'all 0.12s',
+                      }}
+                    >
+                      {icons[s]}
+                    </button>
+                  )
+                })}
+              </div>
+
               <button className="btn btn-ghost"
                       onClick={() => { setEditing(selected); setSelected(null) }}
                       title="Edit (E)"
@@ -586,6 +613,7 @@ export function SampleViewer({ sessionId, classNames }: Props) {
                       onDismiss={dismissSuggestion}
                       hoveredBox={hoveredBox}
                       onHoverBox={setHoveredBox}
+                      boxStyle={boxStyle}
                     />
                   </div>
                 </div>
@@ -946,6 +974,7 @@ function AnnotatedImageHud({
   onDismiss,
   hoveredBox = null,
   onHoverBox,
+  boxStyle = 'corners',
 }: {
   sample: ImageSample
   maxHeight?: string
@@ -957,6 +986,7 @@ function AnnotatedImageHud({
   onDismiss?: (idx: number) => void
   hoveredBox?: number | null
   onHoverBox?: (idx: number | null) => void
+  boxStyle?: BoxStyle
 }) {
   const imgRef = useRef<HTMLImageElement>(null)
   const [dims, setDims] = useState({ w: 0, h: 0 })
@@ -989,6 +1019,7 @@ function AnnotatedImageHud({
               dimmed={lightbox && hoveredBox !== null && hoveredBox !== idx}
               onMouseEnter={lightbox ? () => onHoverBox?.(idx) : undefined}
               onMouseLeave={lightbox ? () => onHoverBox?.(null) : undefined}
+              boxStyle={boxStyle}
             />
           ))}
           {/* Ghost suggested boxes — skip dismissed, below-threshold, or overlapping existing */}
